@@ -11,8 +11,16 @@ from io import BytesIO
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-UPLOAD_FOLDER = 'uploads/'
-PROCESSED_FOLDER = 'processed/'
+
+# Use /tmp for Vercel serverless environment
+IS_VERCEL = os.environ.get('VERCEL', False)
+if IS_VERCEL:
+    UPLOAD_FOLDER = '/tmp/uploads/'
+    PROCESSED_FOLDER = '/tmp/processed/'
+else:
+    UPLOAD_FOLDER = 'uploads/'
+    PROCESSED_FOLDER = 'processed/'
+
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -21,23 +29,31 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 
 
 def ensure_directory(path: str) -> None:
-    os.makedirs(path, exist_ok=True)
+    try:
+        os.makedirs(path, exist_ok=True)
+    except Exception as e:
+        print(f"Warning: Could not create directory {path}: {e}")
 
 
 def clear_directory(path: str) -> None:
     ensure_directory(path)
-    for entry in os.listdir(path):
-        entry_path = os.path.join(path, entry)
-        if os.path.isdir(entry_path):
-            shutil.rmtree(entry_path)
-        else:
-            os.remove(entry_path)
+    try:
+        for entry in os.listdir(path):
+            entry_path = os.path.join(path, entry)
+            if os.path.isdir(entry_path):
+                shutil.rmtree(entry_path)
+            else:
+                os.remove(entry_path)
+    except Exception as e:
+        print(f"Warning: Could not clear directory {path}: {e}")
 
 
-
-ensure_directory(app.config['UPLOAD_FOLDER'])
-# clear_directory(app.config['PROCESSED_FOLDER']) # Don't clear on every restart, maybe just ensure it exists
-ensure_directory(app.config['PROCESSED_FOLDER'])
+# Only create directories if not in module import context
+try:
+    ensure_directory(UPLOAD_FOLDER)
+    ensure_directory(PROCESSED_FOLDER)
+except Exception as e:
+    print(f"Warning: Directory initialization failed: {e}")
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -46,8 +62,11 @@ def allowed_file(filename):
 
 
 def load_font(size: int) -> ImageFont.FreeTypeFont:
+    # Get the directory where app.py is located
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    
     font_candidates = [
-        os.path.join('templates', 'fonts', 'Outfit-SemiBold.ttf'),
+        os.path.join(app_dir, 'templates', 'fonts', 'Outfit-SemiBold.ttf'),
         '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
         '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
         '/usr/share/fonts/truetype/freefont/FreeSans.ttf',
