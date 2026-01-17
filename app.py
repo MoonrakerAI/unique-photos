@@ -298,7 +298,7 @@ def process_photos():
                     branding_lines.append(plus_code)
                 
                 if branding_lines:
-                    font_size_base = max(int(footer_height * 0.2), 16)
+                    font_size_base = max(int(footer_height * 0.5), 24)
                     footer_rect = (0, footer_y_start, img.width, img.height + footer_height)
                     draw_footer_text(draw, branding_lines, footer_rect, font_size_base)
                 
