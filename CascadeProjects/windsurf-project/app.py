@@ -1,6 +1,6 @@
 # This is a simple web application using Flask to allow users to upload logos and QR codes to client photos.
 
-from flask import Flask, request, send_file, render_template, jsonify, send_from_directory
+from flask import Flask, request, send_file, render_template, jsonify, send_from_directory, make_response
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import os
 import zipfile
@@ -11,6 +11,14 @@ from io import BytesIO
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
+
+# CORS support for Vercel
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response
 
 # Use /tmp for Vercel serverless environment
 IS_VERCEL = os.environ.get('VERCEL', False)
