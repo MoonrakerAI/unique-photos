@@ -1,0 +1,35 @@
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Processed files (temporary)
+processed/
+uploads/
+
+# Logs
+*.log
+server.log
+
+# IDE
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+
+# Local env
+.env
+.env.local
+
+# Vercel
+.vercel/
+
+# Old project structure
+CascadeProjects/
