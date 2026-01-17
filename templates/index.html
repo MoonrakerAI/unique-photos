@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Branding Tool</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'outfit': ['Outfit', 'sans-serif'],
+                        'inter': ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'primary': '#00D47E',
+                    },
+                    boxShadow: {
+                        'elevation-1': '0 2px 4px -1px rgba(0,0,0,0.2), 0 1px 10px 0 rgba(0,0,0,0.12), 0 4px 5px 0 rgba(0,0,0,0.14)',
+                        'elevation-2': '0 3px 5px -1px rgba(0,0,0,0.2), 0 6px 10px 0 rgba(0,0,0,0.14), 0 1px 18px 0 rgba(0,0,0,0.12)',
+                        'elevation-4': '0 5px 5px -3px rgba(0,0,0,0.2), 0 8px 10px 1px rgba(0,0,0,0.14), 0 3px 14px 2px rgba(0,0,0,0.12)',
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        .drop-zone {
+            border: 2px dashed #6b7280;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.drag-over {
+            border-color: #3b82f6;
+            background-color: #f8fafc;
+        }
+
+        .preview-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .preview-item {
+            position: relative;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            overflow: hidden;
+        }
+
+        .preview-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+        }
+
+        .preview-item input {
+            width: 100%;
+            padding: 0.25rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.25rem;
+            margin-top: 0.25rem;
+        }
+
+        .logo-preview,
+        .qr-preview {
+            max-width: 100px;
+            max-height: 100px;
+            margin-top: 0.5rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.25rem;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 min-h-screen p-4 md:p-8 font-inter text-gray-800">
+    <div class="max-w-4xl mx-auto">
+        <header class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-gray-900 mb-3 font-outfit">Photo Branding Tool</h1>
+            <p class="text-gray-600 text-lg">Easily add your logo and QR code to multiple photos at once</p>
+            <div class="w-20 h-1 bg-primary mx-auto mt-4 rounded-full"></div>
+        </header>
+
+        <div class="max-w-4xl mx-auto">
+            <form id="uploadForm" class="space-y-8 bg-white p-8 rounded-xl shadow-elevation-2">
+                <!-- 1. Practice Information -->
+                <div class="space-y-6 bg-gray-50 p-6 rounded-lg border border-gray-100">
+                    <div class="flex items-center space-x-2 mb-3">
+                        <span class="material-icons text-primary">business</span>
+                        <h2 class="text-xl font-semibold text-gray-800 font-outfit">1. Practice Information</h2>
+                    </div>
+
+                    <!-- Practice Name -->
+                    <div class="space-y-2">
+                        <label for="practice_name" class="block text-sm font-medium text-gray-700">
+                            <span class="material-icons align-middle text-primary text-base">business_center</span>
+                            <span>Practice Name</span>
+                        </label>
+                        <div class="relative">
+                            <input type="text" name="practice_name" id="practice_name" placeholder="Your Practice Name"
+                                class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition duration-200">
+                            <span class="material-icons absolute left-3 top-3 text-gray-400">business</span>
+                        </div>
+                        <p class="text-xs text-gray-500 ml-6">Will be displayed on the bottom of each photo</p>
+                    </div>
+
+                    <!-- Plus Code -->
+                    <div class="space-y-2">
+                        <label for="plus_code" class="block text-sm font-medium text-gray-700">
+                            <span class="material-icons align-middle text-primary text-base">place</span>
+                            <span>Plus Code</span>
+                        </label>
+                        <div class="relative">
+                            <input type="text" name="plus_code" id="plus_code"
+                                placeholder="e.g., 849VCWC8+R9, San Francisco, CA"
+                                class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition duration-200">
+                            <span class="material-icons absolute left-3 top-3 text-gray-400">qr_code_2</span>
+                        </div>
+                        <p class="text-xs text-gray-500 ml-6">Incorporates plus code, city, and state for branding and
+                            naming.</p>
+                    </div>
+
+                </div>
+
+                <!-- 2. QR Code Section -->
+                <div class="space-y-6 bg-gray-50 p-6 rounded-lg border border-gray-100">
+                    <div class="flex items-center space-x-2 mb-3">
+                        <span class="material-icons text-primary">qr_code</span>
+                        <h2 class="text-xl font-semibold text-gray-800 font-outfit">2. Add QR Code</h2>
+                    </div>
+
+                    <!-- QR Code URL Input -->
+                    <div class="space-y-2">
+                        <label for="qr_url" class="block text-sm font-medium text-gray-700">
+                            <span class="material-icons align-middle text-primary text-base">link</span>
+                            <span>Enter Google Maps <strong>Long Link</strong> to generate QR code:</span>
+                        </label>
+                        <div class="relative">
+                            <input type="url" name="qr_url" id="qr_url"
+                                placeholder="Paste Google Maps 'Long Link' here..."
+                                class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition duration-200">
+                            <span class="material-icons absolute left-3 top-3 text-gray-400">link</span>
+                        </div>
+                        <p class="text-xs text-primary font-medium ml-6">
+                            <span class="material-icons text-xs align-middle">auto_fix_high</span>
+                            <span>Automatically removes tracking parameters from Maps links</span>
+                        </p>
+                        <p class="text-xs text-gray-500 ml-6 mt-1 italic">
+                            Note: Use the full URL from your browser address bar after finding your practice on Google
+                            Maps.
+                        </p>
+                    </div>
+
+
+                    <!-- QR Code Preview -->
+                    <div id="qrPreviewSection" class="hidden mt-4">
+                        <div class="text-sm font-medium text-gray-700 mb-2">QR Code Preview:</div>
+                        <div class="flex justify-center bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                            <div id="qrGeneratedPreview" class="p-2 bg-white rounded">
+                                <!-- Generated QR code will appear here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Logo Upload -->
+                <div class="space-y-3 bg-gray-50 p-6 rounded-lg border border-gray-100">
+                    <div class="flex items-center space-x-2 mb-3">
+                        <span class="material-icons text-primary">image</span>
+                        <h2 class="text-xl font-semibold text-gray-800 font-outfit">3. Upload Logo</h2>
+                    </div>
+                    <div class="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-6">
+                        <div class="flex-1">
+                            <input type="file" name="logo" id="logo" accept="image/*" class="hidden" />
+                            <div id="logoDropZone"
+                                class="drop-zone hover:shadow-elevation-1 transition-shadow duration-200">
+                                <div class="text-center p-4">
+                                    <span class="material-icons text-4xl text-gray-300 mb-2">cloud_upload</span>
+                                    <p class="text-gray-600 font-medium">Drag & drop your logo here</p>
+                                    <p class="text-sm text-gray-400 mt-1">or click to browse files</p>
+                                    <p class="text-xs text-gray-400 mt-2">Recommended: 200x200px PNG with transparency
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            class="w-32 h-32 bg-white border border-gray-200 rounded-lg flex items-center justify-center overflow-hidden shadow-sm">
+                            <div id="logoPreview" class="logo-preview w-full h-full flex items-center justify-center">
+                                <span class="text-gray-300">Preview</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Photos Upload -->
+                <div class="space-y-4 bg-gray-50 p-6 rounded-lg border border-gray-100">
+                    <div class="flex items-center space-x-2 mb-3">
+                        <span class="material-icons text-primary">photo_library</span>
+                        <h2 class="text-xl font-semibold text-gray-800 font-outfit">4. Upload Photos <span
+                                class="text-sm font-normal text-gray-500">(Up to 10)</span></h2>
+                    </div>
+
+                    <input type="file" name="photos" id="photos" accept="image/*" multiple class="hidden" />
+                    <div id="photosDropZone"
+                        class="drop-zone hover:shadow-elevation-1 transition-shadow duration-200 border-2 border-dashed border-gray-300 hover:border-primary/50">
+                        <div class="text-center p-6">
+                            <span class="material-icons text-5xl text-gray-300 mb-3">photo_camera</span>
+                            <h3 class="text-lg font-medium text-gray-700 mb-1">Drag & drop your photos here</h3>
+                            <p class="text-gray-500">or click to browse files</p>
+                            <p class="text-xs text-gray-400 mt-2">Supports JPG, PNG, GIF (Max 10 files)</p>
+                        </div>
+                    </div>
+
+                    <div id="fileList" class="mt-6 w-full">
+                        <!-- File previews will be added here -->
+                    </div>
+                </div>
+
+                <!-- 5. File Naming -->
+                <div class="space-y-6 bg-gray-50 p-6 rounded-lg border border-gray-100">
+                    <div class="flex items-center space-x-2 mb-3">
+                        <span class="material-icons text-primary">edit</span>
+                        <h2 class="text-xl font-semibold text-gray-800 font-outfit">5. Customize File Names <span
+                                class="text-sm font-normal text-gray-500">(Optional)</span></h2>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="flex items-center space-x-4">
+                            <div class="flex-1">
+                                <label for="namingPattern" class="block text-sm font-medium text-gray-700 mb-1">Naming
+                                    Pattern</label>
+                                <div class="relative">
+                                    <input type="text" id="namingPattern" value="{practice} {n}"
+                                        placeholder="e.g., photo_{n}"
+                                        class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition duration-200">
+                                    <span class="material-icons absolute left-3 top-3 text-gray-400">short_text</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            class="flex items-start space-x-2 text-sm text-gray-500 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                            <span class="material-icons text-blue-400 text-sm">info</span>
+                            <div class="space-y-1">
+                                <p>Available tokens: <code class="bg-blue-100 px-1 rounded text-blue-700">{n}</code>
+                                    (number), <code class="bg-blue-100 px-1 rounded text-blue-700">{practice}</code>,
+                                    <code class="bg-blue-100 px-1 rounded text-blue-700">{pluscode}</code>
+                                </p>
+                                <p class="text-xs">Example: <code
+                                        class="text-blue-600 font-mono">{practice}_{pluscode}_{n}</code> → <code
+                                        class="text-blue-600 font-mono">MyClinic_849VCWC8+R9_01.jpg</code></p>
+                            </div>
+                        </div>
+                        <div id="fileNamesPreview"
+                            class="mt-4 p-4 bg-white rounded-lg border border-gray-200 shadow-sm min-h-[50px]">
+                            <!-- Name previews will appear here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview Section -->
+                <div id="previewSection" class="hidden">
+                    <h2 class="text-lg font-medium text-gray-900 mb-4">Preview</h2>
+                    <div id="previewContainer" class="preview-container">
+                        <!-- Preview items will be added here by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="pt-2">
+                    <button type="submit"
+                        class="w-full bg-primary hover:bg-[#00C175] text-white font-semibold py-4 px-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 flex items-center justify-center space-x-2">
+                        <span class="material-icons">auto_fix_high</span>
+                        <span>Process & Download All Photos</span>
+                    </button>
+                    <p class="text-xs text-center text-gray-500 mt-3">Your photos will be processed and downloaded as a
+                        ZIP file</p>
+                </div>
+            </form>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+        <script>
+            // DOM Elements
+            const logoInput = document.getElementById('logo');
+            const qrUrlInput = document.getElementById('qr_url');
+            const photosInput = document.getElementById('photos');
+            const logoDropZone = document.getElementById('logoDropZone');
+            const qrPreviewSection = document.getElementById('qrPreviewSection');
+            const qrGeneratedPreview = document.getElementById('qrGeneratedPreview');
+            const fileList = document.getElementById('fileList');
+            const namingPattern = document.getElementById('namingPattern');
+            const fileNamesPreview = document.getElementById('fileNamesPreview');
+            const uploadForm = document.getElementById('uploadForm');
+
+            // Track files and state
+            let files = [];
+
+            // Set up drag and drop for all zones
+            function setupDropZone(dropZone, input, callback) {
+                // Prevent default drag behaviors
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, preventDefaults, false);
+                });
+
+                // Highlight drop zone when item is dragged over it
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, () => {
+                        dropZone.classList.add('drag-over');
+                    });
+                });
+
+                // Remove highlight when item leaves
+                ['dragleave', 'drop', 'dragend'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, () => {
+                        dropZone.classList.remove('drag-over');
+                    });
+                });
+
+                // Handle dropped files
+                dropZone.addEventListener('drop', (e) => {
+                    const dt = e.dataTransfer;
+                    const files = dt.files;
+
+                    if (files.length) {
+                        // Create a new DataTransfer object to set files
+                        const dataTransfer = new DataTransfer();
+                        for (let i = 0; i < files.length; i++) {
+                            dataTransfer.items.add(files[i]);
+                        }
+                        input.files = dataTransfer.files;
+
+                        // Trigger the callback with the input event
+                        const event = new Event('change');
+                        input.dispatchEvent(event);
+
+                        if (callback) {
+                            callback({ target: input });
+                        }
+                    }
+                });
+
+                // Make the drop zone clickable
+                dropZone.style.cursor = 'pointer';
+                dropZone.addEventListener('click', () => {
+                    input.click();
+                });
+            }
+
+            // Set up all drop zones
+            setupDropZone(logoDropZone, logoInput, handleLogoSelect);
+            setupDropZone(photosDropZone, photosInput, handlePhotosSelect);
+
+            // Prevent default drag behaviors
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            // Event listeners
+            logoInput.addEventListener('change', handleLogoSelect);
+            photosInput.addEventListener('change', handlePhotosSelect);
+
+            // Debounced QR code generation
+            let qrDebounce;
+
+            function cleanUrl(url) {
+                if (!url) return '';
+                // Handle various Google Maps URL formats
+                const isGoogleMaps = url.includes('google.com/maps') ||
+                    url.includes('maps.google.com') ||
+                    url.includes('maps.app.goo.gl');
+
+                if (isGoogleMaps && url.includes('?')) {
+                    // Return only the part before the first '?'
+                    return url.split('?')[0];
+                }
+                return url;
+            }
+
+            qrUrlInput.addEventListener('input', (e) => {
+                const cleaned = cleanUrl(e.target.value);
+                if (cleaned !== e.target.value) {
+                    e.target.value = cleaned;
+                }
+
+                clearTimeout(qrDebounce);
+                qrDebounce = setTimeout(() => {
+                    generateQRCode(e.target.value);
+                }, 500);
+            });
+
+            qrUrlInput.addEventListener('paste', (e) => {
+                // Give it a moment to actually paste before cleaning
+                setTimeout(() => {
+                    const cleaned = cleanUrl(qrUrlInput.value);
+                    if (cleaned !== qrUrlInput.value) {
+                        qrUrlInput.value = cleaned;
+                        generateQRCode(cleaned);
+                    }
+                }, 0);
+            });
+
+            // Debounced file name preview update
+            let nameDebounce;
+            namingPattern.addEventListener('input', () => {
+                clearTimeout(nameDebounce);
+                nameDebounce = setTimeout(updateFileNamesPreview, 300);
+            });
+
+            // Update rename preview when practice info changes
+            document.getElementById('practice_name').addEventListener('input', updateFileNamesPreview);
+            document.getElementById('plus_code').addEventListener('input', updateFileNamesPreview);
+
+            // Handle logo selection and preview
+            function handleLogoSelect(e) {
+                const file = e.target.files[0];
+                if (file && file.type.match('image.*')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        logoPreview.innerHTML = `
+                        <img src="${e.target.result}" 
+                             alt="Logo Preview" 
+                             class="w-full h-full object-contain transition-transform duration-300">
+                    `;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+
+
+            // Generate QR code from URL with debounce
+            function generateQRCode(url) {
+                clearTimeout(qrDebounce);
+
+                if (!url) {
+                    qrPreviewSection.classList.add('hidden');
+                    return;
+                }
+
+                try {
+                    // Validate URL
+                    new URL(url);
+
+                    // Show loading state
+                    qrGeneratedPreview.innerHTML = `
+                    <div class="flex flex-col items-center justify-center p-4">
+                        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary mb-2"></div>
+                        <p class="text-sm text-gray-500">Generating QR Code...</p>
+                    </div>
+                `;
+                    qrPreviewSection.classList.remove('hidden');
+
+                    // Debounce to avoid too many generations while typing
+                    qrDebounce = setTimeout(() => {
+                        // Generate QR code
+                        QRCode.toDataURL(url, {
+                            width: 200,
+                            margin: 1,
+                            color: {
+                                dark: '#000000',
+                                light: '#ffffff'
+                            }
+                        }, (err, url) => {
+                            if (err) {
+                                console.error('Error generating QR code:', err);
+                                qrGeneratedPreview.innerHTML = `
+                                <div class="text-center p-4 text-red-500">
+                                    <p>Error generating QR code</p>
+                                    <p class="text-xs">${err.message}</p>
+                                </div>
+                            `;
+                                return;
+                            }
+
+                            qrGeneratedPreview.innerHTML = `
+                            <img src="${url}" 
+                                 alt="Generated QR Code" 
+                                 class="w-32 h-32 transition-all duration-300 hover:scale-105">
+                        `;
+
+                        });
+                    }, 500);
+
+                } catch (e) {
+                    console.error('Invalid URL:', e);
+                    qrGeneratedPreview.innerHTML = `
+                    <div class="text-center p-4 text-yellow-600">
+                        <p>Please enter a valid URL</p>
+                        <p class="text-xs">Example: https://example.com</p>
+                    </div>
+                `;
+                    qrPreviewSection.classList.remove('hidden');
+                }
+            }
+
+            // Handle photos selection and preview
+            function handlePhotosSelect(e) {
+                const newFiles = Array.from(e.target.files);
+                if (files.length + newFiles.length > 10) {
+                    alert('You can upload a maximum of 10 files');
+                    return;
+                }
+
+                files = [...files, ...newFiles].slice(0, 10);
+                updateFileList();
+                updateFileNamesPreview();
+            }
+
+            // Remove a file from the list
+            function removeFile(index) {
+                files.splice(index, 1);
+                updateFileList();
+                updateFileNamesPreview();
+            }
+
+            // Update the file list display with enhanced previews
+            function updateFileList() {
+                if (files.length === 0) {
+                    fileList.innerHTML = ''; // Clear the file list when empty
+                    return;
+                }
+
+                const fileItems = files.map((file, index) => {
+                    const isImage = file.type.startsWith('image/');
+                    const previewUrl = isImage ? URL.createObjectURL(file) : '';
+                    const fileName = file.name;
+                    const fileExt = fileName.split('.').pop().toLowerCase();
+                    const fileSize = formatFileSize(file.size);
+                    const fileDate = new Date(file.lastModified).toLocaleDateString();
+
+                    // File type specific icons and colors
+                    const fileTypes = {
+                        image: { icon: 'image', color: 'bg-blue-100 text-blue-600' },
+                        pdf: { icon: 'picture_as_pdf', color: 'bg-red-100 text-red-600' },
+                        video: { icon: 'videocam', color: 'bg-purple-100 text-purple-600' },
+                        doc: { icon: 'description', color: 'bg-blue-50 text-blue-600' },
+                        xls: { icon: 'table_chart', color: 'bg-green-50 text-green-600' },
+                        default: { icon: 'insert_drive_file', color: 'bg-gray-100 text-gray-600' }
+                    };
+
+                    let fileType = 'default';
+                    if (isImage) fileType = 'image';
+                    else if (file.type === 'application/pdf') fileType = 'pdf';
+                    else if (file.type.startsWith('video/')) fileType = 'video';
+                    else if (['doc', 'docx'].includes(fileExt)) fileType = 'doc';
+                    else if (['xls', 'xlsx'].includes(fileExt)) fileType = 'xls';
+
+                    const { icon, color } = fileTypes[fileType];
+
+                    return `
+                    <div class="file-item w-full group relative bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200 overflow-hidden" data-index="${index}">
+                        <div class="flex items-start p-4">
+                            <!-- File Thumbnail -->
+                            <div class="relative flex-shrink-0">
+                                ${isImage ? `
+                                    <div class="w-24 h-24 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center relative">
+                                        <img src="${previewUrl}" 
+                                             alt="${file.name.replace(/"/g, '&quot;')}" 
+                                             class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                             loading="lazy">
+                                        <div class="absolute inset-0 bg-black/5 group-hover:bg-black/10 transition-colors"></div>
+                                    </div>
+                                ` : `
+                                    <div class="w-24 h-24 rounded-lg ${color} flex flex-col items-center justify-center border border-gray-100">
+                                        <span class="material-icons text-4xl">${icon}</span>
+                                        <span class="text-xs font-medium mt-1">${fileExt.toUpperCase()}</span>
+                                    </div>
+                                `}
+                            </div>
+                            
+                            <!-- File Info -->
+                            <div class="ml-4 flex-1 min-w-0">
+                                <div class="flex items-start justify-between">
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            ${fileSize} • ${fileDate}
+                                        </p>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${color} bg-opacity-20">
+                                            ${fileExt.toUpperCase()}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Progress Bar -->
+                                <div class="mt-3">
+                                    <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                        <div id="progress-${index}" 
+                                             data-progress="${index}"
+                                             class="h-full bg-yellow-500 rounded-full transition-all duration-300" 
+                                             style="width: 0%">
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                        <span>0%</span>
+                                        <span class="text-yellow-600 font-medium">Pending</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Actions -->
+                                <div class="mt-3 flex space-x-2">
+                                    <button type="button" 
+                                            onclick="event.stopPropagation(); previewFile(${index})"
+                                            class="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary/50 transition-colors">
+                                        <span class="material-icons text-base mr-1">visibility</span> View
+                                    </button>
+                                    <button type="button" 
+                                            onclick="event.stopPropagation(); removeFile(${index})"
+                                            class="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded-lg text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500/50 transition-colors">
+                                        <span class="material-icons text-base mr-1">delete</span> Remove
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Preview Panel (Hidden by default) -->
+                        <div class="preview-panel hidden border-t border-gray-100 bg-gray-50 p-4">
+                            <div class="space-y-4">
+                                <div>
+                                    <h4 class="text-sm font-medium text-gray-700 mb-2">Original: ${fileName}</h4>
+                                    <div class="bg-white p-4 rounded-lg border border-gray-200 flex items-center justify-center">
+                                        ${isImage ? `
+                                            <img src="${previewUrl}" 
+                                                 alt="Original ${file.name}" 
+                                                 class="max-h-96 max-w-full object-contain">
+                                        ` : `
+                                            <div class="py-12 text-center text-gray-400">
+                                                <span class="material-icons text-5xl mb-2">${icon}</span>
+                                                <p class="text-sm">Preview not available for this file type</p>
+                                            </div>
+                                        `}
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 class="text-sm font-medium text-gray-700 mb-2">Processed Preview: ${fileName.replace(/\.([^.]+)$/, '_branded.$1')}</h4>
+                                    <div class="bg-white p-4 rounded-lg border border-gray-200 flex items-center justify-center" id="processed-preview-${index}">
+                                        <div class="py-12 text-center">
+                                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                                            <p class="text-sm text-gray-500">Processing preview...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                }).join('');
+
+                const totalSize = files.reduce((acc, file) => acc + file.size, 0);
+
+                fileList.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                    ${fileItems}
+                </div>
+                
+                <!-- Summary Bar -->
+                <div class="mt-6 bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap items-center justify-between shadow-sm">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm font-medium text-gray-700">${files.length} file${files.length !== 1 ? 's' : ''} selected</span>
+                        <span class="text-xs text-gray-500">•</span>
+                        <span class="text-sm text-gray-500">${formatFileSize(totalSize)}</span>
+                    </div>
+                    <button type="button" 
+                            onclick="clearAllFiles()" 
+                            class="text-sm font-medium text-red-500 hover:text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors">
+                        Clear all
+                    </button>
+                </div>
+            `;
+
+                // Update file count
+                // fileCount.textContent = `${files.length} file${files.length !== 1 ? 's' : ''}`;
+            }
+
+            // Format file size
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            // Helper to apply pattern tokens
+            function applyNamingPattern(pattern, index, fileName) {
+                if (!pattern) return fileName;
+
+                const practiceName = document.getElementById('practice_name')?.value || 'Practice';
+                const plusCodeValue = document.getElementById('plus_code')?.value || '';
+
+                // Parse plus_code for city and state (expected format: pluscode, City, ST)
+                let city = '';
+                let state = '';
+                if (plusCodeValue.includes(',')) {
+                    const parts = plusCodeValue.split(',').map(s => s.trim());
+                    if (parts.length >= 2) city = parts[1];
+                    if (parts.length >= 3) state = parts[2];
+                }
+
+                const ext = fileName.split('.').pop();
+                let newName = pattern
+                    .replace(/{n}/g, String(index + 1).padStart(2, '0'))
+                    .replace(/{practice}/g, practiceName.replace(/\s+/g, '_'))
+                    .replace(/{pluscode}/g, plusCodeValue.replace(/\s+/g, '_').replace(/\+/g, 'plus'));
+
+                // Remove any double underscores or trailing underscores that might result from empty tokens
+                newName = newName.replace(/_+/g, '_').replace(/_$/, '').replace(/^_/, '');
+
+                return `${newName}.${ext}`;
+            }
+
+            // Update file names preview based on pattern
+            function updateFileNamesPreview() {
+                if (files.length === 0) {
+                    fileNamesPreview.innerHTML = `
+                    <p class="text-sm text-gray-400 text-center py-4">Upload files to see name previews</p>
+                `;
+                    return;
+                }
+
+                const pattern = namingPattern.value.trim();
+
+                if (!pattern) {
+                    fileNamesPreview.innerHTML = files.map((file, i) => `
+                    <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                        <span class="text-sm font-mono text-gray-700 truncate" title="${file.name}">
+                            ${file.name}
+                        </span>
+                        <span class="text-xs text-gray-400 ml-2 whitespace-nowrap">
+                            ${formatFileSize(file.size)}
+                        </span>
+                    </div>
+                `).join('');
+                    return;
+                }
+
+                fileNamesPreview.innerHTML = files.map((file, i) => {
+                    const newName = applyNamingPattern(pattern, i, file.name);
+
+                    return `
+                    <div class="group flex items-center justify-between p-2 hover:bg-gray-50 rounded transition-colors">
+                        <div class="min-w-0">
+                            <div class="text-sm font-medium text-gray-700 truncate" title="${newName}">
+                                ${newName}
+                            </div>
+                            <div class="flex items-center">
+                                <span class="text-xs text-gray-500 line-through mr-2 truncate" style="max-width: 120px;">
+                                    ${file.name}
+                                </span>
+                                <span class="text-xs text-gray-400">→</span>
+                                <span class="text-xs text-primary ml-2">
+                                    New name
+                                </span>
+                            </div>
+                        </div>
+                        <span class="text-xs text-gray-400 ml-2 whitespace-nowrap">
+                            ${formatFileSize(file.size)}
+                        </span>
+                    </div>
+                `;
+                }).join('');
+            }
+
+            // Update progress for a specific file
+            function updateFileProgress(fileIndex, progress) {
+                const progressBar = document.querySelector(`[data-progress="${fileIndex}"]`);
+                const statusText = progressBar?.parentElement?.previousElementSibling?.querySelector('span:last-child');
+
+                if (progressBar) {
+                    progressBar.style.width = `${progress}%`;
+                    progressBar.classList.toggle('bg-yellow-500', progress < 100);
+                    progressBar.classList.toggle('bg-primary', progress === 100);
+                }
+
+                if (statusText) {
+                    statusText.textContent = progress === 100 ? 'Processed' : 'Processing...';
+                    statusText.className = `font-medium ${progress === 100 ? 'text-green-600' : 'text-yellow-600'}`;
+                }
+            }
+
+            // Clear all files
+            window.clearAllFiles = function () {
+                files = [];
+                updateFileList();
+                updateFileNamesPreview();
+                showAlert('All files have been removed', 'info');
+            };
+
+            // Preview file in modal
+            window.previewFile = function (index, event) {
+                if (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+
+                const fileItem = document.querySelector(`.file-item[data-index="${index}"]`);
+                if (!fileItem) return;
+
+                const previewPanel = fileItem.querySelector('.preview-panel');
+                if (!previewPanel) return;
+
+                const isVisible = !previewPanel.classList.contains('hidden');
+
+                // Close all other preview panels
+                document.querySelectorAll('.preview-panel').forEach(panel => {
+                    if (panel !== previewPanel) {
+                        panel.classList.add('hidden');
+                        const parent = panel.closest('.file-item');
+                        if (parent) {
+                            parent.classList.remove('border-primary', 'ring-2', 'ring-primary/20');
+                        }
+                    }
+                });
+
+                // Toggle current preview panel
+                if (isVisible) {
+                    previewPanel.classList.add('hidden');
+                    fileItem.classList.remove('border-primary', 'ring-2', 'ring-primary/20');
+                } else {
+                    previewPanel.classList.remove('hidden');
+                    fileItem.classList.add('border-primary', 'ring-2', 'ring-primary/20');
+                    // Generate preview if not already done
+                    generatePreview(index);
+                    // Scroll the preview into view
+                    previewPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            };
+
+            // Helper function to get file type info
+            function getFileTypeInfo(file) {
+                const fileName = file.name;
+                const fileExt = fileName.split('.').pop().toLowerCase();
+
+                const fileTypes = {
+                    image: { icon: 'image', color: '#3b82f6' },
+                    pdf: { icon: 'picture_as_pdf', color: '#ef4444' },
+                    video: { icon: 'videocam', color: '#8b5cf6' },
+                    doc: { icon: 'description', color: '#3b82f6' },
+                    xls: { icon: 'table_chart', color: '#10b981' },
+                    default: { icon: 'insert_drive_file', color: '#6b7280' }
+                };
+
+                let fileType = 'default';
+                if (file.type.startsWith('image/')) fileType = 'image';
+                else if (file.type === 'application/pdf') fileType = 'pdf';
+                else if (file.type.startsWith('video/')) fileType = 'video';
+                else if (['doc', 'docx'].includes(fileExt)) fileType = 'doc';
+                else if (['xls', 'xlsx'].includes(fileExt)) fileType = 'xls';
+
+                return fileTypes[fileType];
+            }
+
+            // Generate preview for a file
+            async function generatePreview(index) {
+                try {
+                    const file = files[index];
+                    if (!file) {
+                        console.error('File not found at index:', index);
+                        return;
+                    }
+
+                    const previewContainer = document.getElementById(`processed-preview-${index}`);
+                    if (!previewContainer) {
+                        console.error('Preview container not found for index:', index);
+                        return;
+                    }
+
+                    // Show loading state
+                    previewContainer.innerHTML = `
+                    <div class="py-12 text-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                        <p class="text-sm text-gray-500">Generating preview...</p>
+                    </div>
+                `;
+
+                    // Simulate processing delay
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
+                    if (file.type.startsWith('image/')) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            previewContainer.innerHTML = `
+                            <img src="${e.target.result}" alt="Preview" class="max-h-96 w-auto mx-auto">
+                        `;
+                        };
+                        reader.onerror = (error) => {
+                            console.error('Error reading file:', error);
+                            throw new Error('Failed to load image');
+                        };
+                        reader.readAsDataURL(file);
+                    } else {
+                        const { icon, color } = getFileTypeInfo(file);
+                        previewContainer.innerHTML = `
+                        <div class="py-12 text-center text-gray-400">
+                            <span class="material-icons text-5xl mb-2" style="color: ${color}">${icon}</span>
+                            <p class="text-sm">Preview not available for this file type</p>
+                        </div>
+                    `;
+                    }
+                } catch (error) {
+                    console.error('Error generating preview:', error);
+                    const previewContainer = document.getElementById(`processed-preview-${index}`);
+                    if (previewContainer) {
+                        previewContainer.innerHTML = `
+                        <div class="py-12 text-center text-red-500">
+                            <span class="material-icons text-5xl mb-2">error_outline</span>
+                            <p class="text-sm">Error generating preview</p>
+                            <p class="text-xs mt-1">${error.message || 'Unknown error'}</p>
+                        </div>
+                    `;
+                    }
+                }
+
+                // Update filename with pattern if available
+                const pattern = document.getElementById('namingPattern')?.value;
+                if (pattern) {
+                    const ext = file.name.split('.').pop();
+                    const newName = `${pattern.replace('{n}', String(index + 1).padStart(2, '0'))}.${ext}`;
+                    filenameContainer.textContent = newName;
+                } else {
+                    filenameContainer.textContent = file.name;
+                }
+            }
+
+            // Get file icon based on type
+            function getFileIcon(file) {
+                if (!file) return 'insert_drive_file';
+
+                const type = file.type;
+                const ext = file.name.split('.').pop().toLowerCase();
+
+                if (type.startsWith('image/')) return 'image';
+                if (type === 'application/pdf') return 'picture_as_pdf';
+                if (type.startsWith('video/')) return 'videocam';
+                if (['doc', 'docx'].includes(ext)) return 'description';
+                if (['xls', 'xlsx'].includes(ext)) return 'table_chart';
+                return 'insert_drive_file';
+            }
+
+            // Handle form submission with better file processing
+            uploadForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                if (files.length === 0) {
+                    showAlert('Please upload at least one photo', 'error');
+                    return;
+                }
+
+                const submitButton = uploadForm.querySelector('button[type="submit"]');
+                const originalButtonText = submitButton.innerHTML;
+                submitButton.disabled = true;
+
+                // Update progress function
+                function updateProgress(processed, total) {
+                    const progress = Math.round((processed / total) * 100);
+                    submitButton.innerHTML = `
+                    <div class="w-full">
+                        <div class="flex justify-between text-xs text-white mb-1">
+                            <span>Processing...</span>
+                            <span>${processed} of ${total}</span>
+                        </div>
+                        <div class="w-full bg-white/20 rounded-full h-2">
+                            <div class="bg-white h-2 rounded-full" style="width: ${progress}%"></div>
+                        </div>
+                    </div>
+                `;
+                }
+
+                try {
+                    // Show initial loading state
+                    submitButton.innerHTML = `
+                    <span class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></span>
+                    Processing...
+                `;
+
+                    // Process all files in a single batch to maintain order
+                    const formData = new FormData();
+
+                    // Add all photos
+                    files.forEach(file => {
+                        formData.append('photos', file);
+                    });
+
+                    // Add logo if provided
+                    if (logoInput.files[0]) {
+                        formData.append('logo', logoInput.files[0]);
+                    }
+
+                    // Add QR code or URL if provided
+                    if (qrUrlInput.value) {
+                        formData.append('qr_url', qrUrlInput.value);
+                    }
+
+                    // Add practice information
+                    const practiceName = document.getElementById('practice_name')?.value || '';
+                    const plusCode = document.getElementById('plus_code')?.value || '';
+
+                    if (practiceName) formData.append('practice_name', practiceName);
+                    if (plusCode) formData.append('plus_code', plusCode);
+
+                    // Add all filenames with pattern if specified
+                    const pattern = namingPattern.value.trim();
+                    files.forEach((file, index) => {
+                        formData.append('file_names', applyNamingPattern(pattern, index, file.name));
+                    });
+
+                    // Show initial progress
+                    updateProgress(0, files.length);
+
+                    try {
+                        // Send the request to the server
+                        const response = await fetch('/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const result = await response.json();
+
+                        if (result.success && result.files && result.files.length > 0) {
+                            // If only one file, download it directly
+                            if (result.files.length === 1) {
+                                const filename = result.files[0];
+                                const response = await fetch(`/download/${filename}`);
+                                const blob = await response.blob();
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = filename;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                window.URL.revokeObjectURL(url);
+                                showAlert('File processed and downloaded successfully!', 'success');
+                            } else {
+                                // For multiple files, create a zip
+                                const zip = new JSZip();
+                                const zipFilename = `branded_photos_${new Date().toISOString().split('T')[0]}.zip`;
+
+                                // Add each file to the zip
+                                const filePromises = result.files.map(async (filename, index) => {
+                                    const fileResponse = await fetch(`/download/${filename}`);
+                                    const blob = await fileResponse.blob();
+                                    zip.file(filename, blob);
+                                    updateProgress(index + 1, result.files.length);
+                                });
+
+                                await Promise.all(filePromises);
+
+                                // Generate and trigger download
+                                const content = await zip.generateAsync({ type: 'blob' });
+                                const url = URL.createObjectURL(content);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = zipFilename;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(url);
+
+                                showAlert(`${result.files.length} files processed and downloaded successfully!`, 'success');
+                            }
+                        } else {
+                            throw new Error(result.error || 'No files were processed');
+                        }
+                    } catch (error) {
+                        console.error('Error downloading files:', error);
+                        throw error; // Re-throw to be caught by the outer catch
+                    }
+
+                } catch (error) {
+                    console.error('Error:', error);
+                    showAlert('An error occurred: ' + error.message, 'error');
+                } finally {
+                    // Reset button state
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonText;
+                }
+            });
+
+            // Show alert message
+            function showAlert(message, type = 'info') {
+                // Remove any existing alerts
+                const existingAlert = document.getElementById('alert-message');
+                if (existingAlert) {
+                    existingAlert.remove();
+                }
+
+                const alertDiv = document.createElement('div');
+                alertDiv.id = 'alert-message';
+                alertDiv.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm transform transition-all duration-300 translate-x-0 ${type === 'error' ? 'bg-red-100 border-l-4 border-red-500 text-red-700' :
+                    type === 'success' ? 'bg-green-100 border-l-4 border-green-500 text-green-700' :
+                        'bg-blue-100 border-l-4 border-blue-500 text-blue-700'
+                    }`;
+
+                alertDiv.innerHTML = `
+                <div class="flex items-center">
+                    <span class="material-icons mr-2">
+                        ${type === 'error' ? 'error' : type === 'success' ? 'check_circle' : 'info'}
+                    </span>
+                    <p class="text-sm font-medium">${message}</p>
+                    <button onclick="this.closest('#alert-message').remove()" class="ml-auto text-gray-500 hover:text-gray-700">
+                        <span class="material-icons text-lg">close</span>
+                    </button>
+                </div>
+            `;
+
+                document.body.appendChild(alertDiv);
+
+                // Auto-remove after 5 seconds
+                setTimeout(() => {
+                    alertDiv.style.transform = 'translateX(120%)';
+                    setTimeout(() => alertDiv.remove(), 300);
+                }, 5000);
+            }
+
+            // Initialize
+            updateFileList();
+            updateFileNamesPreview();
+
+            // Add global removeFile function for inline event handlers
+            window.removeFile = removeFile;
+        </script>
+</body>
+
+</html>

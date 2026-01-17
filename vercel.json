@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "CascadeProjects/windsurf-project/app.py",
+      "src": "app.py",
       "use": "@vercel/python",
       "config": {
         "maxLambdaSize": "50mb"
@@ -16,22 +16,22 @@
         "POST",
         "OPTIONS"
       ],
-      "dest": "CascadeProjects/windsurf-project/app.py"
+      "dest": "app.py"
     },
     {
       "src": "/download/(.*)",
       "methods": [
         "GET"
       ],
-      "dest": "CascadeProjects/windsurf-project/app.py"
+      "dest": "app.py"
     },
     {
       "src": "/(.*)",
-      "dest": "CascadeProjects/windsurf-project/app.py"
+      "dest": "app.py"
     }
   ],
   "functions": {
-    "CascadeProjects/windsurf-project/app.py": {
+    "app.py": {
       "memory": 3008,
       "maxDuration": 300
     }
