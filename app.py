@@ -99,11 +99,11 @@ def draw_footer_text(draw, lines, footer_rect, font_size_base):
     if not lines:
         return
 
-    # Use a slightly smaller font for secondary lines
+    # Use a slightly smaller font for secondary lines (90% of main)
     font_main = load_font(int(font_size_base))
-    font_sub = load_font(int(font_size_base * 0.8))
+    font_sub = load_font(int(font_size_base * 0.9))
     
-    line_spacing = int(font_size_base * 0.2)
+    line_spacing = int(font_size_base * 0.3)
     
     # Calculate total height of text block
     total_text_height = 0
@@ -127,6 +127,7 @@ def draw_footer_text(draw, lines, footer_rect, font_size_base):
         x = footer_center_x - (data['w'] // 2)
         draw.text((x, current_y), data['text'], font=data['font'], fill=(0, 0, 0, 255))
         current_y += data['h'] + line_spacing
+
 
 
 def upload_to_blob(file_content, filename, content_type='image/jpeg'):
@@ -298,7 +299,7 @@ def process_photos():
                     branding_lines.append(plus_code)
                 
                 if branding_lines:
-                    font_size_base = max(int(footer_height * 0.5), 24)
+                    font_size_base = max(int(footer_height * 0.7), 48)
                     footer_rect = (0, footer_y_start, img.width, img.height + footer_height)
                     draw_footer_text(draw, branding_lines, footer_rect, font_size_base)
                 
