@@ -1,4 +1,5 @@
 # This is a simple web application using Flask to allow users to upload logos and QR codes to client photos.
+# Uses Vercel Blob for file storage to bypass serverless function payload limits.
 
 from flask import Flask, request, send_file, render_template, jsonify, send_from_directory, make_response
 from PIL import Image, ImageDraw, ImageFont, ImageOps
@@ -7,6 +8,8 @@ import zipfile
 import io
 import shutil
 import qrcode
+import requests
+import json
 from io import BytesIO
 from werkzeug.utils import secure_filename
 
@@ -22,6 +25,8 @@ def add_cors_headers(response):
 
 # Use /tmp for Vercel serverless environment
 IS_VERCEL = os.environ.get('VERCEL', False)
+BLOB_READ_WRITE_TOKEN = os.environ.get('BLOB_READ_WRITE_TOKEN', '')
+
 if IS_VERCEL:
     UPLOAD_FOLDER = '/tmp/uploads/'
     PROCESSED_FOLDER = '/tmp/processed/'
@@ -123,40 +128,90 @@ def draw_footer_text(draw, lines, footer_rect, font_size_base):
         draw.text((x, current_y), data['text'], font=data['font'], fill=(0, 0, 0, 255))
         current_y += data['h'] + line_spacing
 
+
+def upload_to_blob(file_content, filename, content_type='image/jpeg'):
+    """Upload a file to Vercel Blob storage"""
+    if not BLOB_READ_WRITE_TOKEN:
+        raise Exception("BLOB_READ_WRITE_TOKEN not configured")
+    
+    headers = {
+        'Authorization': f'Bearer {BLOB_READ_WRITE_TOKEN}',
+        'Content-Type': content_type,
+        'x-api-version': '7',
+    }
+    
+    # Use the Vercel Blob API
+    response = requests.put(
+        f'https://blob.vercel-storage.com/{filename}',
+        headers=headers,
+        data=file_content
+    )
+    
+    if response.status_code == 200:
+        result = response.json()
+        return result.get('url')
+    else:
+        raise Exception(f"Failed to upload to Blob: {response.status_code} - {response.text}")
+
+
+def download_from_url(url):
+    """Download a file from a URL"""
+    response = requests.get(url)
+    if response.status_code == 200:
+        return BytesIO(response.content)
+    else:
+        raise Exception(f"Failed to download from URL: {response.status_code}")
+
+
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/upload', methods=['POST'])
-def upload():
+
+@app.route('/api/blob-token', methods=['GET'])
+def get_blob_token():
+    """Return the blob token for client-side uploads"""
+    if not BLOB_READ_WRITE_TOKEN:
+        return jsonify({'error': 'Blob storage not configured'}), 500
+    return jsonify({'token': BLOB_READ_WRITE_TOKEN})
+
+
+@app.route('/process', methods=['POST'])
+def process_photos():
+    """Process photos from Blob URLs"""
     try:
-        # Handle logo upload
-        logo = None
-        if 'logo' in request.files and request.files['logo'].filename != '':
-            logo_file = request.files['logo']
-            if not allowed_file(logo_file.filename):
-                return jsonify({'error': 'Invalid logo file type. Allowed types: png, jpg, jpeg, gif'}), 400
-            
-            # Save logo to a temporary file
-            logo_path = os.path.join(app.config['UPLOAD_FOLDER'], 'temp_logo.png')
-            logo_file.save(logo_path)
-            logo = logo_path
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
         
-        # Handle QR code (either uploaded image, URL, or generated from Google Place ID)
-        qr_code = None
-        qr_url = request.form.get('qr_url', '').strip()
-        practice_name = request.form.get('practice_name', '').strip()
-        plus_code = request.form.get('plus_code', '').strip()
-        qr_url_generated = False
+        photo_urls = data.get('photo_urls', [])
+        logo_url = data.get('logo_url')
+        qr_url = data.get('qr_url')
+        practice_name = data.get('practice_name', '').strip()
+        plus_code = data.get('plus_code', '').strip()
+        file_names = data.get('file_names', [])
         
-        if qr_url:
-            # Clean Google Maps URL if needed (remove tracking parameters)
-            is_google_maps = any(domain in qr_url for domain in ['google.com/maps', 'maps.google.com', 'maps.app.goo.gl'])
-            if is_google_maps and '?' in qr_url:
-                qr_url = qr_url.split('?')[0]
-                
-            # Generate QR code from URL
+        if not photo_urls:
+            return jsonify({'error': 'No photos provided'}), 400
+        
+        # Download and prepare logo if provided
+        logo_img = None
+        if logo_url:
             try:
+                logo_data = download_from_url(logo_url)
+                logo_img = Image.open(logo_data).convert('RGBA')
+            except Exception as e:
+                print(f"Error downloading logo: {e}")
+        
+        # Generate QR code if URL provided
+        qr_img = None
+        if qr_url:
+            try:
+                # Clean Google Maps URL if needed
+                is_google_maps = any(domain in qr_url for domain in ['google.com/maps', 'maps.google.com', 'maps.app.goo.gl'])
+                if is_google_maps and '?' in qr_url:
+                    qr_url = qr_url.split('?')[0]
+                
                 qr = qrcode.QRCode(
                     version=1,
                     error_correction=qrcode.constants.ERROR_CORRECT_H,
@@ -165,200 +220,133 @@ def upload():
                 )
                 qr.add_data(qr_url)
                 qr.make(fit=True)
-                
-                # Create QR code image
-                qr_img = qr.make_image(fill_color="black", back_color="white")
-                
-                # Save to a temporary file
-                qr_path = os.path.join(app.config['UPLOAD_FOLDER'], 'generated_qr.png')
-                qr_img.save(qr_path)
-                qr_code = qr_path
-                
+                qr_img = qr.make_image(fill_color="black", back_color="white").convert('RGBA')
             except Exception as e:
-                if os.path.exists(logo):
-                    os.remove(logo)
-                return jsonify({'error': f'Error generating QR code: {str(e)}'}), 400
-    
-        # Check if photos were uploaded
-        if 'photos' not in request.files or not any(f for f in request.files.getlist('photos') if f.filename):
-            if logo and os.path.exists(logo):
-                os.remove(logo)
-            if qr_code and os.path.exists(qr_code):
-                os.remove(qr_code)
-            return jsonify({'error': 'No photos uploaded'}), 400
-            
-        photos = request.files.getlist('photos')
-        # Filter out empty file inputs and validate file types
-        valid_photos = []
-        for photo in photos:
-            if photo and photo.filename and allowed_file(photo.filename):
-                valid_photos.append(photo)
+                print(f"Error generating QR code: {e}")
         
-        if not valid_photos:
-            if logo and os.path.exists(logo):
-                os.remove(logo)
-            if qr_code and os.path.exists(qr_code):
-                os.remove(qr_code)
-            return jsonify({'error': 'No valid photos uploaded. Supported formats: png, jpg, jpeg, gif'}), 400
+        processed_urls = []
         
-        # Get file names from form data
-        file_names = request.form.getlist('file_names')
-        
-        # If no names provided or not enough, use original filenames
-        if not file_names or len(file_names) != len(valid_photos):
-            file_names = [os.path.splitext(photo.filename)[0] for photo in valid_photos]
-        
-        processed_files = []
-        output_filenames = []
-        
-        # Process each photo
-        for i, photo in enumerate(valid_photos):
+        for i, photo_url in enumerate(photo_urls):
             try:
-                # Create a safe filename
-                filename = secure_filename(photo.filename)
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                photo.save(file_path)
+                # Download photo from Blob
+                photo_data = download_from_url(photo_url)
+                img = Image.open(photo_data)
                 
-                # Open the image and process it
-                with Image.open(file_path) as img:
-                    # Fix orientation based on EXIT data
-                    img = ImageOps.exif_transpose(img)
-                    img = img.convert('RGBA')
-                    
-                    # Clear metadata by creating a new image
-                    clean_img = Image.new('RGBA', img.size, (255, 255, 255, 255))
-                    clean_img.paste(img, (0, 0), img)
-                    
-                    # Calculate footer height (around 15% of image height, minimum 120px)
-                    footer_height = max(int(img.height * 0.15), 120)
-                    new_size = (img.width, img.height + footer_height)
-                    
-                    # Create new white canvas
-                    clean_img = Image.new('RGBA', new_size, (255, 255, 255, 255))
-                    clean_img.paste(img, (0, 0), img)
-                    
-                    draw = ImageDraw.Draw(clean_img)
-                    footer_y_start = img.height
-                    # Reduce padding for larger elements and closer-to-edge look
-                    side_padding = int(img.width * 0.02)
-                    top_bottom_padding = int(footer_height * 0.1)
-                    content_height = footer_height - (top_bottom_padding * 2)
-                    
-                    # Define consistent fixed height for top elements (360px)
-                    target_element_height = 360
-                    
-                    # Process logo if provided (Top Left)
-                    if logo and os.path.exists(logo):
-                        try:
-                            with Image.open(logo) as logo_img:
-                                logo_img = logo_img.convert('RGBA')
-                                # Logo size: Keep height locked to target, allow width to be up to 30%
-                                logo_img.thumbnail((int(img.width * 0.3), target_element_height), Image.LANCZOS)
-                                
-                                # Apply 50% opacity to logo
-                                alpha = logo_img.split()[3]
-                                alpha = alpha.point(lambda p: int(p * 0.5))
-                                logo_img.putalpha(alpha)
-                                
-                                # Position at Top Left with padding
-                                clean_img.paste(logo_img, (side_padding, side_padding), logo_img)
-                        except Exception as e:
-                            print(f"Error processing logo: {e}")
-                    
-                    # Process QR code if provided (Top Right - Sync height with logo)
-                    if qr_code and os.path.exists(qr_code):
-                        try:
-                            with Image.open(qr_code) as qr_img:
-                                qr_img = qr_img.convert('RGBA')
-                                # QR size: Lock height to target_element_height
-                                qr_img.thumbnail((target_element_height, target_element_height), Image.LANCZOS)
-                                
-                                # Apply 50% opacity to QR code
-                                alpha = qr_img.split()[3]
-                                alpha = alpha.point(lambda p: int(p * 0.5))
-                                qr_img.putalpha(alpha)
-                                
-                                # Position at Top Right with padding
-                                qr_x = img.width - qr_img.width - side_padding
-                                clean_img.paste(qr_img, (qr_x, side_padding), qr_img)
-                        except Exception as e:
-                            print(f"Error processing QR code: {e}")
-                    
-                    branding_lines = []
-                    if practice_name:
-                        branding_lines.append(practice_name)
-                    if plus_code:
-                        branding_lines.append(plus_code)
-                    
-                    if branding_lines:
-                        # Draw centered text in the middle of the footer
-                        font_size_base = max(int(footer_height * 0.2), 16)
-                        footer_rect = (0, footer_y_start, img.width, img.height + footer_height)
-                        draw_footer_text(draw, branding_lines, footer_rect, font_size_base)
-                    
-                    # Generate output filename with original extension
-                    original_ext = os.path.splitext(photo.filename)[1].lower()
-                    if not original_ext or original_ext not in ['.png', '.jpg', '.jpeg', '.gif']:
-                        original_ext = '.png'
-                    
-                    # Get base name from custom pattern or original filename
-                    # Strip any existing extension from the base name to prevent double extensions
-                    base_name = file_names[i] if i < len(file_names) else f"photo_{i+1}"
-                    base_name = os.path.splitext(base_name)[0]  # Remove any extension
+                # Fix orientation based on EXIF data
+                img = ImageOps.exif_transpose(img)
+                img = img.convert('RGBA')
+                
+                # Clear metadata by creating a new image
+                clean_img = Image.new('RGBA', img.size, (255, 255, 255, 255))
+                clean_img.paste(img, (0, 0), img)
+                
+                # Calculate footer height (around 15% of image height, minimum 120px)
+                footer_height = max(int(img.height * 0.15), 120)
+                new_size = (img.width, img.height + footer_height)
+                
+                # Create new white canvas
+                clean_img = Image.new('RGBA', new_size, (255, 255, 255, 255))
+                clean_img.paste(img, (0, 0), img)
+                
+                draw = ImageDraw.Draw(clean_img)
+                footer_y_start = img.height
+                side_padding = int(img.width * 0.02)
+                top_bottom_padding = int(footer_height * 0.1)
+                content_height = footer_height - (top_bottom_padding * 2)
+                
+                # Define consistent fixed height for top elements (360px)
+                target_element_height = 360
+                
+                # Process logo if provided (Top Left)
+                if logo_img:
+                    try:
+                        logo_copy = logo_img.copy()
+                        logo_copy.thumbnail((int(img.width * 0.3), target_element_height), Image.LANCZOS)
+                        
+                        # Apply 50% opacity to logo
+                        alpha = logo_copy.split()[3]
+                        alpha = alpha.point(lambda p: int(p * 0.5))
+                        logo_copy.putalpha(alpha)
+                        
+                        # Position at Top Left with padding
+                        clean_img.paste(logo_copy, (side_padding, side_padding), logo_copy)
+                    except Exception as e:
+                        print(f"Error processing logo: {e}")
+                
+                # Process QR code if provided (Top Right)
+                if qr_img:
+                    try:
+                        qr_copy = qr_img.copy()
+                        qr_copy.thumbnail((target_element_height, target_element_height), Image.LANCZOS)
+                        
+                        # Apply 50% opacity to QR code
+                        alpha = qr_copy.split()[3]
+                        alpha = alpha.point(lambda p: int(p * 0.5))
+                        qr_copy.putalpha(alpha)
+                        
+                        # Position at Top Right with padding
+                        qr_x = img.width - qr_copy.width - side_padding
+                        clean_img.paste(qr_copy, (qr_x, side_padding), qr_copy)
+                    except Exception as e:
+                        print(f"Error processing QR code: {e}")
+                
+                # Draw footer text
+                branding_lines = []
+                if practice_name:
+                    branding_lines.append(practice_name)
+                if plus_code:
+                    branding_lines.append(plus_code)
+                
+                if branding_lines:
+                    font_size_base = max(int(footer_height * 0.2), 16)
+                    footer_rect = (0, footer_y_start, img.width, img.height + footer_height)
+                    draw_footer_text(draw, branding_lines, footer_rect, font_size_base)
+                
+                # Get filename
+                if i < len(file_names) and file_names[i]:
+                    base_name = file_names[i]
+                    base_name = os.path.splitext(base_name)[0]
                     base_name = secure_filename(base_name)
-                    
-                    output_name = f"{base_name}{original_ext}"
-                    output_path = os.path.join(PROCESSED_FOLDER, output_name)
-                    
-                    # Ensure unique filename
-                    counter = 1
-                    while os.path.exists(output_path):
-                        output_name = f"{base_name}_{counter}{original_ext}"
-                        output_path = os.path.join(PROCESSED_FOLDER, output_name)
-                        counter += 1
-                    
-                    # Ensure output directory exists
-                    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                    
-                    # Save the processed image with the correct format
-                    if output_name.lower().endswith('.png'):
-                        clean_img.save(output_path, 'PNG')
-                    else:
-                        rgb_img = clean_img.convert('RGB')
-                        rgb_img.save(output_path, 'JPEG', quality=95)
-                    
-                    processed_files.append(output_path)
-                    output_filenames.append(os.path.basename(output_path))
-                    
-                    # Clean up the uploaded file
-                    os.remove(file_path)
-            
+                else:
+                    base_name = f"photo_{i+1}"
+                
+                output_name = f"{base_name}.jpg"
+                
+                # Save to BytesIO
+                output_buffer = BytesIO()
+                rgb_img = clean_img.convert('RGB')
+                rgb_img.save(output_buffer, 'JPEG', quality=95)
+                output_buffer.seek(0)
+                
+                # Upload to Blob
+                processed_url = upload_to_blob(output_buffer.read(), output_name, 'image/jpeg')
+                processed_urls.append({
+                    'url': processed_url,
+                    'filename': output_name
+                })
+                
             except Exception as e:
-                app.logger.error(f"Error processing {photo.filename}: {str(e)}")
+                print(f"Error processing photo {i}: {e}")
                 continue
-            
-        # Clean up temporary files
-        if logo and os.path.exists(logo):
-            os.remove(logo)
-        if qr_code and os.path.exists(qr_code):
-            os.remove(qr_code)
         
-        if not processed_files:
+        if not processed_urls:
             return jsonify({'error': 'Failed to process any photos'}), 500
         
-        # Return the list of processed files
         return jsonify({
             'success': True,
-            'files': output_filenames
+            'files': processed_urls
         })
         
     except Exception as e:
-        # Clean up any remaining files in case of error
-        if 'logo' in locals() and logo and os.path.exists(logo):
-            os.remove(logo)
-        if 'qr_code' in locals() and qr_code and os.path.exists(qr_code):
-            os.remove(qr_code)
-        return jsonify({'error': f'An error occurred during processing: {str(e)}'}), 500
+        print(f"Error in process_photos: {e}")
+        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
+
+
+# Keep legacy upload endpoint for backwards compatibility
+@app.route('/upload', methods=['POST'])
+def upload():
+    return jsonify({'error': 'Direct uploads are not supported. Please use Blob storage.'}), 400
+
 
 @app.route('/download/<filename>')
 def download_file(filename):
