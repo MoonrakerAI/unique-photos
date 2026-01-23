@@ -16,7 +16,10 @@ import concurrent.futures
 from io import BytesIO
 from werkzeug.utils import secure_filename
 
-app = Flask(__name__, static_folder='static', static_url_path='/static')
+app = Flask(__name__, 
+            static_folder='../static', 
+            static_url_path='/static',
+            template_folder='../templates')
 
 # CORS support for Vercel
 @app.after_request
@@ -86,7 +89,7 @@ def load_font(size: int) -> ImageFont.FreeTypeFont:
     app_dir = os.path.dirname(os.path.abspath(__file__))
     
     font_candidates = [
-        os.path.join(app_dir, 'templates', 'fonts', 'Outfit-SemiBold.ttf'),
+        os.path.join(app_dir, '..', 'templates', 'fonts', 'Outfit-SemiBold.ttf'),
         '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
         '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
         '/usr/share/fonts/truetype/freefont/FreeSans.ttf',
