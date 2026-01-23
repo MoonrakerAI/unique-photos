@@ -185,7 +185,7 @@ def get_blob_token():
 
 @app.route('/api/generate-image', methods=['POST'])
 def generate_image():
-    """Generate an image using Gemini 2.0 Flash"""
+    """Generate images using Imagen 3 via Google AI Studio"""
     try:
         if not GOOGLE_API_KEY:
             return jsonify({'error': 'GOOGLE_API_KEY not configured'}), 500
@@ -195,45 +195,44 @@ def generate_image():
             return jsonify({'error': 'No prompt provided'}), 400
             
         prompt = data.get('prompt')
+        count = min(max(int(data.get('count', 1)), 1), 10)
         
-        # Initialize the model
-        # Note: Using gemini-2.0-flash which supports imagen
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        # Using Imagen 3 for high-quality generation
+        # "imagen-3.0-generate-001" is the current standard in AI Studio
+        model = genai.GenerativeModel("imagen-3.0-generate-001")
         
-        # Generate the image
-        # The API for image generation in Gemini 2.0 Flash is typically via the generate_content
-        # but specifically with the imagen task if enabled, or via a dedicated imagen model if available.
-        # For Gemini 2.0 Flash, it uses the 'imagen' tool or similar if integrated.
-        # However, the standard way in the current SDK for "Nano Banana" (Gemini 2.0 Flash) 
-        # to generate images is often through the 'imagen-3' model or similar if available in the project.
-        # Let's use the most direct approach for Gemini 2.0 Flash image generation.
+        generated_files = []
         
-        # Actually, for standard Gemini 2.0 Flash API, image generation is handled via:
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                response_mime_type="image/jpeg",
-            )
-        )
-        
-        if not response.parts:
-            return jsonify({'error': 'Failed to generate image: No parts in response'}), 500
+        # Generate requested number of images
+        for i in range(count):
+            response = model.generate_content(prompt)
             
-        # Extract the image data
-        image_part = next((part for part in response.parts if part.inline_data), None)
-        if not image_part:
-            return jsonify({'error': 'Failed to generate image: Image data not found in response'}), 500
+            if not response.candidates or not response.candidates[0].content.parts:
+                continue
+                
+            # Extract the image data
+            image_part = next((part for part in response.candidates[0].content.parts if part.inline_data), None)
+            if not image_part:
+                continue
+                
+            image_bytes = image_part.inline_data.data
             
-        image_bytes = image_part.inline_data.data
+            # Upload to Vercel Blob
+            ts = int(time.time())
+            filename = f"generated_{secure_filename(prompt[:20])}_{ts}_{i}.jpg"
+            blob_url = upload_to_blob(image_bytes, filename, 'image/jpeg')
+            
+            generated_files.append({
+                'url': blob_url,
+                'filename': filename
+            })
         
-        # Upload to Vercel Blob
-        filename = f"generated_{secure_filename(prompt[:20])}_{int(time.time())}.jpg"
-        blob_url = upload_to_blob(image_bytes, filename, 'image/jpeg')
-        
+        if not generated_files:
+            return jsonify({'error': 'Failed to generate any images. Check your prompt safety or API quota.'}), 500
+            
         return jsonify({
             'success': True,
-            'url': blob_url,
-            'filename': filename
+            'files': generated_files
         })
         
     except Exception as e:
