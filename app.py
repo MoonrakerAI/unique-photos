@@ -12,6 +12,7 @@ import requests
 import json
 import google.generativeai as genai
 import time
+import concurrent.futures
 from io import BytesIO
 from werkzeug.utils import secure_filename
 
@@ -201,31 +202,47 @@ def generate_image():
         # "nano-banana-pro-preview" is the confirmed available model
         model = genai.GenerativeModel("nano-banana-pro-preview")
         
+        def generate_and_upload(index):
+            """Helper function for parallel execution"""
+            try:
+                # Generate image
+                response = model.generate_content(prompt)
+                
+                if not response.candidates or not response.candidates[0].content.parts:
+                    return None
+                    
+                # Extract the image data
+                image_part = next((part for part in response.candidates[0].content.parts if part.inline_data), None)
+                if not image_part:
+                    return None
+                    
+                image_bytes = image_part.inline_data.data
+                
+                # Upload to Vercel Blob
+                ts = int(time.time())
+                filename = f"generated_{secure_filename(prompt[:20])}_{ts}_{index}.jpg"
+                blob_url = upload_to_blob(image_bytes, filename, 'image/jpeg')
+                
+                return {
+                    'url': blob_url,
+                    'filename': filename
+                }
+            except Exception as e:
+                print(f"Error in parallel generation task {index}: {e}")
+                return None
+
         generated_files = []
         
-        # Generate requested number of images
-        for i in range(count):
-            response = model.generate_content(prompt)
+        # Parallelize the generation and upload process
+        with concurrent.futures.ThreadPoolExecutor(max_workers=count) as executor:
+            # Submit all tasks
+            future_to_index = {executor.submit(generate_and_upload, i): i for i in range(count)}
             
-            if not response.candidates or not response.candidates[0].content.parts:
-                continue
-                
-            # Extract the image data
-            image_part = next((part for part in response.candidates[0].content.parts if part.inline_data), None)
-            if not image_part:
-                continue
-                
-            image_bytes = image_part.inline_data.data
-            
-            # Upload to Vercel Blob
-            ts = int(time.time())
-            filename = f"generated_{secure_filename(prompt[:20])}_{ts}_{i}.jpg"
-            blob_url = upload_to_blob(image_bytes, filename, 'image/jpeg')
-            
-            generated_files.append({
-                'url': blob_url,
-                'filename': filename
-            })
+            # Collect results as they complete
+            for future in concurrent.futures.as_completed(future_to_index):
+                result = future.result()
+                if result:
+                    generated_files.append(result)
         
         if not generated_files:
             return jsonify({'error': 'Failed to generate any images. Check your prompt safety or API quota.'}), 500
