@@ -197,9 +197,9 @@ def generate_image():
         prompt = data.get('prompt')
         count = min(max(int(data.get('count', 1)), 1), 10)
         
-        # Using Imagen 3 for high-quality generation
-        # "imagen-3.0-generate-001" is the current standard in AI Studio
-        model = genai.GenerativeModel("imagen-3.0-generate-001")
+        # Using Nano Banana (Gemini 2.0 Flash) for high-quality generation
+        # "nano-banana-pro-preview" is the confirmed available model
+        model = genai.GenerativeModel("nano-banana-pro-preview")
         
         generated_files = []
         
