@@ -35,7 +35,8 @@
     </script>
     <style>
         .drop-zone {
-            border: 2px dashed #6b7280;
+            border: 2px dashed #D1D5DB;
+            /* gray-300 */
             border-radius: 0.5rem;
             padding: 2rem;
             text-align: center;
@@ -45,7 +46,8 @@
 
         .drop-zone:hover,
         .drop-zone.drag-over {
-            border-color: #3b82f6;
+            border-color: #00D47E;
+            /* primary */
             background-color: #F0FEFB;
         }
 
@@ -192,12 +194,11 @@
                             <input type="file" name="logo" id="logo" accept="image/*" class="hidden" />
                             <div id="logoDropZone"
                                 class="drop-zone hover:shadow-elevation-1 transition-shadow duration-200">
-                                <div class="text-center p-4">
-                                    <span class="material-icons text-4xl text-gray-300 mb-2">cloud_upload</span>
-                                    <p class="text-gray-600 font-medium">Drag & drop your logo here</p>
-                                    <p class="text-sm text-gray-400 mt-1">or click to browse files</p>
-                                    <p class="text-xs text-gray-400 mt-2">Recommended: 200x200px PNG with transparency
-                                    </p>
+                                <div class="text-center p-6">
+                                    <span class="material-icons text-5xl text-gray-300 mb-3">cloud_upload</span>
+                                    <h3 class="text-lg font-medium text-gray-700 mb-1">Drag & drop your logo here</h3>
+                                    <p class="text-gray-500 text-sm">or click to browse files</p>
+                                    <p class="text-xs text-gray-400 mt-2">Recommended: 200x200px PNG (Transparent)</p>
                                 </div>
                             </div>
                         </div>
@@ -217,8 +218,6 @@
                             <span class="material-icons text-primary text-2xl">auto_awesome</span>
                             <h2 class="text-xl font-semibold text-gray-800 font-outfit">Nano Banana AI Generator</h2>
                         </div>
-                        <span
-                            class="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded-full uppercase tracking-wider">Experimental</span>
                     </div>
 
                     <div class="space-y-4">
@@ -285,8 +284,7 @@
                     </div>
 
                     <input type="file" name="photos" id="photos" accept="image/*" multiple class="hidden" />
-                    <div id="photosDropZone"
-                        class="drop-zone hover:shadow-elevation-1 transition-shadow duration-200 border-2 border-dashed border-gray-300 hover:border-primary/50">
+                    <div id="photosDropZone" class="drop-zone hover:shadow-elevation-1 transition-shadow duration-200">
                         <div class="text-center p-6">
                             <span class="material-icons text-5xl text-gray-300 mb-3">photo_camera</span>
                             <h3 class="text-lg font-medium text-gray-700 mb-1">Drag & drop your images here</h3>
